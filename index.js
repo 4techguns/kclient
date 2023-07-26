@@ -51,7 +51,7 @@ t.inputField({
             const data = JSON.parse(split[0][2])
             t.eraseLineBefore()
             t.eraseLineAfter()
-            t(`${data.username}: ${addMarkDown(data.text)}\n`)
+            t(`${data.username == "karbis" ? "^gkarbis^:" : data.username}: ${addMarkDown(data.text)}\n`)
             t.bell()
             printOnline()
         } else if (type == "typing") {
