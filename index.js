@@ -5,7 +5,7 @@ const fs = require("fs")
 const silentJoin = process.argv.includes("-s")
 
 let online = 0
-let mute = false
+let mute = true
 let typethingy = false
 let spinner
 
@@ -36,9 +36,19 @@ t.inputField({
 }, async (e, name) => {
     t(" ")
 
-    const printOnline = () => {
-        t.moveTo(1, 1).bgGreen(` ${name} | ${online} online | Press tab to open the menu `)
-        t.moveTo(1, t.height)
+    const printOnline = (typing) => {
+        const header1template = ` ${name} | ${online} online | Press tab to open the menu`
+        t.saveCursor()
+        t.moveTo(1, 1).bgGreen(header1template + ' '.repeat(t.width - header1template.length))
+        if (typing != undefined) {
+            const header2template = ` Typing: ${typing.join(", ")} `
+            if (typing.length > 0) {
+                t.moveTo(1, 2).bgYellow(header2template + ' '.repeat(t.width - header2template.length))
+            } else {
+                t.moveTo(1, 2).black(' '.repeat(t.width))
+            }
+        }
+        t.restoreCursor()
     }
 
     let spin = await t.spinner('bitDots');
@@ -103,9 +113,19 @@ t.inputField({
 
     t.grabInput()
 
-    t.on('key', (name, matches, da) => {
-        if (name === "TAB") {
+    t.on('key', (kn, m, da) => {
+        if (kn === "TAB") {
             openMenu()
+        } else if (!typethingy) {
+            typethingy = true
+            socket.send(JSON.stringify({
+                type: "typeWakeup",
+                username: name
+            }))
+
+            setTimeout(() => {
+                typethingy = false
+            }, 5000)
         }
     })
 
@@ -119,17 +139,15 @@ t.inputField({
             const data = JSON.parse(split[0][2])
             t.eraseLineBefore()
             t.eraseLineAfter()
-            t(`${data.username == "karbis" ? "^gkarbis^:" : data.username}: ${addMarkDown(data.text)}`)
+            t(`${data.username == "karbis" ? "karbis ✓" : data.username}: ${addMarkDown(data.text)}\r`)
             t.scrollUp(1)
             if (!mute) t.bell()
             t.notify("Message", `${data.username}: ${data.text}`)
             printOnline()
         } else if (type == "typing") {
             const data = JSON.parse(split[0][2])
-            if (data.length > 0) {
-                typethingy = true
-                t.yellow(` ${data} ${data.length > 1 ? "are" : "is"} typing\r`)
-            }
+            typing = data
+            printOnline(data)
         } else if (type == "onlineCount") {
             const data = split[0][2]
             online = data
@@ -153,6 +171,7 @@ t.inputField({
                 username: name,
                 text: message
             })
+            typethingy = false
             socket.send(payload)
             printOnline()
             t("\r")
