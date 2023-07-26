@@ -1,7 +1,12 @@
 const ws = require("ws")
 const t = require("terminal-kit").terminal
+const fs = require("fs")
+
+const silentJoin = process.argv.includes("-s")
+
 let online = 0
 let mute = false
+let typethingy = false
 let spinner
 
 const markdowns = [
@@ -21,9 +26,10 @@ function addMarkDown(text) {
     })
     return newText
 }
-t.eraseDisplay()
 
 function open() {
+    t.eraseDisplay()
+    if (silentJoin) { t.white.bgRed(" [silent join enabled] \n") }
     t.blue("Enter name: ")
 t.inputField({
     default: ""
@@ -31,16 +37,77 @@ t.inputField({
     t(" ")
 
     const printOnline = () => {
-        t.moveTo(1, 1).bgGreen(` ${name} | ${online} online | Type !menu for menu                                  `)
+        t.moveTo(1, 1).bgGreen(` ${name} | ${online} online | Press tab to open the menu `)
         t.moveTo(1, t.height)
     }
 
-    let spin = await t.spinner('impulse');
+    let spin = await t.spinner('bitDots');
     t.yellow(" connecting...\n")
 	markdowns[5][0] = new RegExp("(?<!\\\\)(@" + name + ")","g")
     const socket = new ws.WebSocket('wss://scholarlyblandbusinesses.karbis3.repl.co', {
         maxHeaderSize: 1000000000000
     });
+
+    const openMenu = () => {
+        const items = ['Exit', 'Logout/Change Name', 'Fetch Messages', 'Clear Chat', `Toggle Sound (${mute ? "Off" : "On"})`, 'Cancel'];
+
+        const options = {
+            y: t.height,
+            selectedStyle: t.bgBlue,
+            align: 'center'
+        };
+
+        t.singleLineMenu(items, options, (er, response) => {
+            switch (response.selectedIndex) {
+                case 0:
+                    t("\nare you sure you wanna exit? ")
+                    t.yesOrNo().promise.then((val) => {
+                        if (val) {
+                            if (!silentJoin) {
+                                socket.send(JSON.stringify({
+                                    type: "message",
+                                    username: name,
+                                    text: "[has disconnected]"
+                                }))
+                            }
+                            socket.close()
+                            t.processExit(0)
+                        }
+                        else {
+                            t.eraseLineBefore("\r")
+                        }
+                    })
+                    break;
+                case 1:
+                    t.eraseDisplay()
+                    socket.close()
+                    open()
+                    break;
+                case 2:
+                    socket.send("{\"type\":\"retrieveMessages\"}")
+                    printOnline()
+                    break;
+                case 3:
+                    t.eraseDisplay()
+                    printOnline()
+                    break;
+                case 4:
+                    mute = !mute
+                    break;
+                case 5:
+                    t.eraseLine("\r")
+                    break;
+            }
+        })
+    }
+
+    t.grabInput()
+
+    t.on('key', (name, matches, da) => {
+        if (name === "TAB") {
+            openMenu()
+        }
+    })
 
     socket.on('message', async (deeta) => {
         const d = deeta.toString();
@@ -52,12 +119,15 @@ t.inputField({
             const data = JSON.parse(split[0][2])
             t.eraseLineBefore()
             t.eraseLineAfter()
-            t(`${data.username == "karbis" ? "^gkarbis^:" : data.username}: ${addMarkDown(data.text)}\n`)
+            t(`${data.username == "karbis" ? "^gkarbis^:" : data.username}: ${addMarkDown(data.text)}`)
+            t.scrollUp(1)
             if (!mute) t.bell()
+            t.notify("Message", `${data.username}: ${data.text}`)
             printOnline()
         } else if (type == "typing") {
             const data = JSON.parse(split[0][2])
             if (data.length > 0) {
+                typethingy = true
                 t.yellow(` ${data} ${data.length > 1 ? "are" : "is"} typing\r`)
             }
         } else if (type == "onlineCount") {
@@ -78,71 +148,15 @@ t.inputField({
     const s = () => {
         t.moveTo(1, t.height)
         t.inputField(async (er, message) => {
-            if (message == "!menu") {
-                var items = ['Exit', 'Logout/Change Name', 'Fetch Messages', 'Clear Chat', 'Toggle Sound', 'Cancel'];
-
-                var options = {
-                    y: t.height,
-                    selectedStyle: t.bgBlue,
-                    align: 'center'
-                };
-
-                t.singleColumnMenu(items, options, (er, response) => {
-                    switch (response.selectedIndex) {
-                        case 0:
-                            t("\nare you sure you wanna exit? ")
-                            t.yesOrNo().promise.then((val) => {
-                                if (val) {
-                                    socket.send(JSON.stringify({
-                                        type: "message",
-                                        username: name,
-                                        text: "[has disconnected]"
-                                    }))
-                                    socket.close()
-                                    t.processExit(0)
-                                }
-                                else {
-                                    t.eraseLineBefore("\r")
-                                    s()
-                                }
-                            })
-                            break;
-                        case 1:
-                            t.eraseDisplay()
-                            socket.close()
-                            open()
-                            break;
-                        case 2:
-                            socket.send("{\"type\":\"retrieveMessages\"}")
-                            printOnline()
-                            s()
-                            break;
-                        case 3:
-                            t.eraseDisplay()
-                            printOnline()
-                            s()
-                            break;
-                        case 4:
-                            mute = !mute
-                            s()
-                            break;
-                        case 5:
-                            t.eraseLine("\r")
-                            s()
-                            break;
-                    }
-                })
-            } else {
-                const payload = JSON.stringify({
-                    type: "message",
-                    username: name,
-                    text: message
-                })
-                socket.send(payload)
-                printOnline()
-                t("\r")
-                s()
-            }
+            const payload = JSON.stringify({
+                type: "message",
+                username: name,
+                text: message
+            })
+            socket.send(payload)
+            printOnline()
+            t("\r")
+            s()
         })
     }
 
@@ -152,11 +166,13 @@ t.inputField({
         t.eraseLineAfter()
         socket.send("{\"type\":\"retrieveMessages\"}")
         
-        socket.send(JSON.stringify({
-            type: "message",
-            username: name,
-            text: "[has connected]"
-        }))
+        if (!silentJoin) {
+            socket.send(JSON.stringify({
+                type: "message",
+                username: name,
+                text: "[has connected]"
+            }))
+        }
         
         printOnline()
         s()
