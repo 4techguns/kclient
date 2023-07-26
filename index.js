@@ -29,23 +29,25 @@ function addMarkDown(text) {
 
 function open() {
     t.eraseDisplay()
+    t.moveTo(1,1)
     if (silentJoin) { t.white.bgRed(" [silent join enabled] \n") }
     t.blue("Enter name: ")
 t.inputField({
-    default: ""
-}, async (e, name) => {
+    maxLength: 30,
+    minLength: 1
+}, async (e, na) => {
+    let name = na
     t(" ")
 
     const printOnline = (typing) => {
         const header1template = ` ${name} | ${online} online | Press tab to open the menu`
         t.saveCursor()
         t.moveTo(1, 1).bgGreen(header1template + ' '.repeat(t.width - header1template.length))
+        t.moveTo(1, 2).black(' '.repeat(t.width))
         if (typing != undefined) {
             const header2template = ` Typing: ${typing.join(", ")} `
             if (typing.length > 0) {
                 t.moveTo(1, 2).bgYellow(header2template + ' '.repeat(t.width - header2template.length))
-            } else {
-                t.moveTo(1, 2).black(' '.repeat(t.width))
             }
         }
         t.restoreCursor()
@@ -59,7 +61,7 @@ t.inputField({
     });
 
     const openMenu = () => {
-        const items = ['Exit', 'Logout/Change Name', 'Fetch Messages', 'Clear Chat', `Toggle Sound (${mute ? "Off" : "On"})`, 'Cancel'];
+        const items = ['Exit', 'Fetch Messages', 'Clear Chat', `Toggle Sound (${mute ? "Off" : "On"})`, 'Cancel'];
 
         const options = {
             y: t.height,
@@ -89,22 +91,20 @@ t.inputField({
                     })
                     break;
                 case 1:
-                    t.eraseDisplay()
-                    socket.close()
-                    open()
-                    break;
-                case 2:
+                    t.eraseLine("\r")
                     socket.send("{\"type\":\"retrieveMessages\"}")
                     printOnline()
                     break;
-                case 3:
+                case 2:
+                    t.eraseLine("\r")
                     t.eraseDisplay()
                     printOnline()
                     break;
-                case 4:
+                case 3:
+                    t.eraseLine("\r")
                     mute = !mute
                     break;
-                case 5:
+                case 4:
                     t.eraseLine("\r")
                     break;
             }
@@ -116,7 +116,7 @@ t.inputField({
     t.on('key', (kn, m, da) => {
         if (kn === "TAB") {
             openMenu()
-        } else if (!typethingy) {
+        } else if (!typethingy && "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`124567890-=~!@#$%^&*()_+[]{};':\",./<>?".includes(kn)) {
             typethingy = true
             socket.send(JSON.stringify({
                 type: "typeWakeup",
@@ -127,6 +127,18 @@ t.inputField({
                 typethingy = false
             }, 5000)
         }
+    })
+
+    socket.on('unexpected-response', (e) => {
+        t.red("error connecting. server might be down (2)\n")
+        t(e + "\n")
+        t.processExit(2)
+    })
+
+    socket.on('error', (e) => {
+        t.red("error connecting. your network might be down (1)\n")
+        t(e + "\n")
+        t.processExit(1)
     })
 
     socket.on('message', async (deeta) => {
