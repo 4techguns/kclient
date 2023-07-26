@@ -1,6 +1,7 @@
 const ws = require("ws")
 const t = require("terminal-kit").terminal
 let online = 0
+let mute = false
 let spinner
 
 const markdowns = [
@@ -52,7 +53,7 @@ t.inputField({
             t.eraseLineBefore()
             t.eraseLineAfter()
             t(`${data.username == "karbis" ? "^gkarbis^:" : data.username}: ${addMarkDown(data.text)}\n`)
-            t.bell()
+            if (!mute) t.bell()
             printOnline()
         } else if (type == "typing") {
             const data = JSON.parse(split[0][2])
@@ -78,7 +79,7 @@ t.inputField({
         t.moveTo(1, t.height)
         t.inputField(async (er, message) => {
             if (message == "!menu") {
-                var items = ['Exit', 'Logout/Change Name', 'Fetch Messages', 'Clear Chat', 'Cancel'];
+                var items = ['Exit', 'Logout/Change Name', 'Fetch Messages', 'Clear Chat', 'Toggle Sound', 'Cancel'];
 
                 var options = {
                     y: t.height,
@@ -122,6 +123,10 @@ t.inputField({
                             s()
                             break;
                         case 4:
+                            mute = !mute
+                            s()
+                            break;
+                        case 5:
                             t.eraseLine("\r")
                             s()
                             break;
