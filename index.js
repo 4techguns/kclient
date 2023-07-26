@@ -4,13 +4,14 @@ let online = 0
 let spinner
 
 const markdowns = [
-    [/\*\*\*(.*)\*\*\*/gm,"^/$1^r"],
-    [/\*\*(.*)\*\*/gm,"^+$1^r"],
+    [/\*\*\*(.*)\*\*\*/gm,"^/$1^:"],[/\*\*(.*)\*\*/gm,"^+$1^:"],
 	[/(\\\*)/gm,"*"],
-	[/~~(.*)~~/gm,"\x1b[9m$1\x1b[0m"],
-	[/__(.*)__/gm,"^_$1^r"],
-	[/(\\~)/gm,"~"],[/(\\_)/gm,"_"],
-	]
+	[/~~(.*)~~/gm,"$1"],
+	[/__(.*)__/gm,"^_$1^:"],
+	[/(?<!\\)(@noOne)/g,'^b^+$1^:'],
+	[/(?<!\\)(@everyone)/g,'^b^+$1^:'],
+	[/(\\~)/gm,"~"],[/(\\_)/gm,"_"],[/\\@/g,"@"],
+]
 
 function addMarkDown(text) {
     var newText = text
@@ -35,6 +36,7 @@ t.inputField({
 
     let spin = await t.spinner('impulse');
     t.yellow(" connecting...\n")
+	markdowns[5][0] = new RegExp("(?<!\\\\)(@" + name + ")","g")
     const socket = new ws.WebSocket('wss://scholarlyblandbusinesses.karbis3.repl.co', {
         maxHeaderSize: 1000000000000
     });
